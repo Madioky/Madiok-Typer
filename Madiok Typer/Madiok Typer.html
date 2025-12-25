@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MADIOK TYPER - GLOBAL</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --main-color: #00f2ff;
+            --text-color: #586069;
+            --sub-color: #c9d1d9;
+            --error-color: #ff4757;
+            --accent-color: #7d5fff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Consolas', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: var(--sub-color);
+            overflow: hidden;
+        }
+
+        header { margin-top: 20px; text-align: center; }
+        h1 { font-size: 2.5rem; color: var(--main-color); text-transform: uppercase; letter-spacing: 5px; text-shadow: 0 0 10px var(--main-color); margin-bottom: 5px; }
+        #player-tag { color: var(--accent-color); font-size: 0.9rem; margin-bottom: 10px; }
+
+        #description-zone { color: var(--text-color); font-size: 0.85rem; margin-bottom: 15px; font-style: italic; height: 20px; }
+
+        nav { display: flex; gap: 10px; margin-bottom: 20px; }
+        .nav-btn { cursor: pointer; padding: 8px 15px; color: var(--text-color); transition: 0.2s; border-bottom: 2px solid transparent; }
+        .nav-btn.active { color: var(--main-color); border-bottom-color: var(--main-color); }
+
+        #main-stage { flex-grow: 1; display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; }
+        #stats-live { font-size: 1.5rem; color: var(--accent-color); margin-bottom: 15px; display: flex; gap: 30px; }
+
+        #game-container { width: 900px; }
+        #words-container { 
+            font-size: 1.8rem; line-height: 2.8rem; display: flex; flex-wrap: wrap; 
+            height: 180px; overflow: hidden; column-gap: 12px;
+        }
+        
+        .word { display: inline-block; }
+        .letter { color: var(--text-color); border-left: 2px solid transparent; }
+        .letter.correct { color: var(--sub-color); }
+        .letter.incorrect { color: var(--error-color); background: rgba(255, 71, 87, 0.1); }
+        .letter.active { border-left-color: var(--main-color); animation: blink 0.8s infinite; }
+
+        #rain-canvas { 
+            display: none; position: relative; width: 800px; height: 350px; 
+            background: rgba(255,255,255,0.03); border: 1px solid #333; border-radius: 10px; overflow: hidden;
+        }
+        .falling-word { position: absolute; color: var(--main-color); font-size: 1.5rem; font-weight: bold; }
+
+        #input-wrapper { margin-top: 30px; visibility: hidden; }
+        #visual-input {
+            background: #161b22; border: 2px solid #30363d; color: white; padding: 12px; width: 350px; 
+            font-size: 1.1rem; text-align: center; border-radius: 8px; outline: none;
+        }
+
+        #results-screen { display: none; text-align: center; width: 100%; max-width: 600px; animation: slideUp 0.5s ease; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .leaderboard-table { width: 100%; margin-top: 20px; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden; }
+        .leaderboard-table th, .leaderboard-table td { padding: 12px; border-bottom: 1px solid #30363d; text-align: center; }
+        .leaderboard-table th { color: var(--main-color); text-transform: uppercase; font-size: 0.8rem; }
+        .top-score { color: #ffd700; font-weight: bold; }
+
+        @keyframes blink { 50% { border-color: transparent; } }
+        button { background: var(--main-color); border:none; padding:12px 25px; cursor:pointer; font-weight:bold; margin-top:20px; border-radius: 5px; color: black; }
+        
+        body.rainbow-active { animation: rainbow-bg 1s infinite linear; }
+        @keyframes rainbow-bg { 0% { background: #300; } 50% { background: #003; } 100% { background: #300; } }
+        .cheat-overlay { position: fixed; top:0; left:0; width:100%; height:100%; display:none; flex-wrap:wrap; opacity:0.1; pointer-events:none; z-index: 100; }
+        .cheat-overlay span { font-size: 2rem; color: white; transform: rotate(-20deg); margin: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="cheat-overlay" class="cheat-overlay"></div>
+    <header>
+        <h1>MADIOK TYPER</h1>
+        <div id="player-tag">JOUEUR : <span id="display-name">...</span></div>
+    </header>
+    <div id="description-zone">Mode Classique : Tapez directement pour commencer.</div>
+
+    <nav>
+        <div class="nav-btn active" id="btn-classic" onclick="switchMode('classic')">CLASSIC TEST</div>
+        <div class="nav-btn" id="btn-rain" onclick="switchMode('rain')">WORD RAIN</div>
+    </nav>
+
+    <div id="main-stage">
+        <div id="stats-live">
+            <span>TIME: <span id="timer" style="color:white">30</span></span>
+            <span>WPM/SCORE: <span id="wpm-display" style="color:white">0</span></span>
+        </div>
+
+        <div id="game-container"><div id="words-container"></div></div>
+        <div id="rain-canvas"></div>
+
+        <div id="input-wrapper">
+            <input type="text" id="visual-input" placeholder="Tapez ici..." autocomplete="off">
+        </div>
+
+        <div id="results-screen">
+            <h2 id="res-title" style="color: var(--main-color)">SESSION TERMINÉE</h2>
+            <div id="cheat-warning" style="color: var(--error-color); display: none; margin-bottom: 15px; font-weight: bold; font-size: 0.9rem;"></div>
+            
+            <div style="display:flex; gap:30px; justify-content:center; margin-bottom: 20px;">
+                <div>WPM<br><span style="font-size: 2.5rem; font-weight: bold;" id="final-wpm">0</span></div>
+                <div>ACC<br><span style="font-size: 2.5rem; font-weight: bold;" id="final-acc">100%</span></div>
+            </div>
+
+            <h3 style="margin-top: 30px; letter-spacing: 2px;">🏆 CLASSEMENT (<span id="mode-name">Classic</span>)</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Rang</th>
+                        <th>Joueur</th>
+                        <th>WPM / Score</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+            </table>
+
+            <button onclick="location.reload()">NOUVEL ESSAI</button>
+        </div>
+    </div>
+
+    <script>
+        // --- INITIALISATION JOUEUR ---
+        let playerName = localStorage.getItem('madiokPlayerName');
+        if (!playerName) {
+            playerName = prompt("Bienvenue ! Entre ton pseudo pour le classement :") || "Anonyme";
+            localStorage.setItem('madiokPlayerName', playerName);
+        }
+        document.getElementById('display-name').innerText = playerName;
+
+        const wordBank = "the quick brown fox jumps over the lazy dog coding typing speed challenge matrix future cyber logic network binary velocity quantum circuit protocol bypass shadow terminal".split(" ");
+        const wordsContainer = document.getElementById('words-container');
+        const visualInput = document.getElementById('visual-input');
+        const rainCanvas = document.getElementById('rain-canvas');
+        const cheatOverlay = document.getElementById('cheat-overlay');
+
+        let mode = 'classic', isPlaying = false, timeLeft = 30;
+        let charIndex = 0, mistakes = 0, gameInterval = null;
+        let hasCheated = false, cheatActive = false;
+        let fallingWords = [], rainTimer = null;
+
+        for(let i=0; i<50; i++) cheatOverlay.innerHTML += "<span>TRICHEUR</span>";
+
+        function switchMode(m) {
+            if (isPlaying) location.reload();
+            mode = m;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + m).classList.add('active');
+            document.getElementById('input-wrapper').style.visibility = (m === 'rain') ? "visible" : "hidden";
+            initGame();
+        }
+
+        function initGame() {
+            wordsContainer.innerHTML = ""; rainCanvas.innerHTML = "";
+            rainCanvas.style.display = (mode === 'rain') ? 'block' : 'none';
+            document.getElementById('game-container').style.display = (mode === 'rain') ? 'none' : 'block';
+            if (mode === 'classic') {
+                [...wordBank].sort(() => Math.random() - 0.5).slice(0, 50).forEach(wordStr => {
+                    const wordSpan = document.createElement('span'); wordSpan.className = 'word';
+                    (wordStr + " ").split("").forEach(l => {
+                        const s = document.createElement('span'); s.className = 'letter'; s.textContent = l; wordSpan.appendChild(s);
+                    });
+                    wordsContainer.appendChild(wordSpan);
+                });
+                wordsContainer.querySelectorAll('.letter')[0].classList.add('active');
+            }
+            visualInput.focus();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.key.toLowerCase() === 't') { cheatActive = !cheatActive; hasCheated = true; }
+            if (e.ctrlKey && e.shiftKey) {
+                cheatActive = true; hasCheated = true;
+                document.body.classList.add('rainbow-active');
+                cheatOverlay.style.display = 'flex';
+            }
+            if (mode === 'classic' && !e.ctrlKey && !e.altKey && e.key !== 'Shift') {
+                if (!isPlaying && e.key.length === 1) startTimer();
+                handleClassicKey(e);
+            }
+        });
+
+        function handleClassicKey(e) {
+            const letters = wordsContainer.querySelectorAll('.letter');
+            if (charIndex >= letters.length) return;
+            if (e.key === "Backspace" && charIndex > 0) {
+                letters[charIndex].classList.remove('active'); charIndex--;
+                letters[charIndex].classList.remove('correct', 'incorrect'); letters[charIndex].classList.add('active'); return;
+            }
+            if (e.key.length === 1) {
+                const target = letters[charIndex];
+                if (cheatActive) target.classList.add('correct');
+                else { if (e.key === target.textContent) target.classList.add('correct'); else { target.classList.add('incorrect'); mistakes++; } }
+                target.classList.remove('active'); charIndex++;
+                if (charIndex < letters.length) letters[charIndex].classList.add('active'); else endArea();
+                let wpm = Math.round((charIndex / 5) / ((30 - timeLeft || 1) / 60));
+                document.getElementById('wpm-display').innerText = cheatActive ? 200 : wpm;
+            }
+        }
+
+        visualInput.addEventListener('input', () => {
+            if (mode !== 'rain') return;
+            if (!isPlaying && visualInput.value.length > 0) startTimer();
+            const typed = visualInput.value.trim();
+            const idx = fallingWords.findIndex(w => w.word === typed || (cheatActive && typed !== ""));
+            if (idx !== -1) {
+                fallingWords[idx].el.remove(); fallingWords.splice(idx, 1);
+                visualInput.value = "";
+                document.getElementById('wpm-display').innerText = parseInt(document.getElementById('wpm-display').innerText) + 10;
+            }
+        });
+
+        function startTimer() {
+            isPlaying = true;
+            gameInterval = setInterval(() => {
+                timeLeft--; document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) endArea();
+            }, 1000);
+            if (mode === 'rain') {
+                rainTimer = setInterval(() => {
+                    const txt = wordBank[Math.floor(Math.random()*wordBank.length)];
+                    const el = document.createElement('div'); el.className = 'falling-word'; el.innerText = txt;
+                    el.style.left = (Math.random() * 600 + 50) + 'px'; el.style.top = '0px';
+                    rainCanvas.appendChild(el); fallingWords.push({ word: txt, el: el, y: 0 });
+                }, 1000);
+                updateRain();
+            }
+        }
+
+        function updateRain() {
+            if (mode !== 'rain' || !isPlaying) return;
+            fallingWords.forEach((w) => { w.y += 1.5; w.el.style.top = w.y + 'px'; if (w.y > 320) endArea("MISSION FAILED"); });
+            requestAnimationFrame(updateRain);
+        }
+
+        function saveScore(score, acc) {
+            if (hasCheated || acc < 70) return;
+            let scores = JSON.parse(localStorage.getItem('madiokGlobalScores_' + mode)) || [];
+            scores.push({ 
+                name: playerName, 
+                score: score, 
+                date: new Date().toLocaleDateString() 
+            });
+            scores.sort((a, b) => b.score - a.score);
+            scores = scores.slice(0, 10);
+            localStorage.setItem('madiokGlobalScores_' + mode, JSON.stringify(scores));
+        }
+
+        function loadLeaderboard() {
+            const scores = JSON.parse(localStorage.getItem('madiokGlobalScores_' + mode)) || [];
+            const body = document.getElementById('leaderboard-body');
+            body.innerHTML = scores.map((s, i) => `
+                <tr class="${i === 0 ? 'top-score' : ''}">
+                    <td>#${i + 1}</td>
+                    <td>${s.name}</td>
+                    <td>${s.score}</td>
+                    <td>${s.date}</td>
+                </tr>
+            `).join('');
+            document.getElementById('mode-name').innerText = mode.toUpperCase();
+        }
+
+        function endArea(msg) {
+            isPlaying = false; clearInterval(gameInterval); clearInterval(rainTimer);
+            const finalScore = parseInt(document.getElementById('wpm-display').innerText);
+            const accuracy = (cheatActive ? 100 : Math.round(((charIndex-mistakes)/charIndex)*100 || 0));
+            
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('rain-canvas').style.display = 'none';
+            document.getElementById('stats-live').style.display = 'none';
+            document.getElementById('input-wrapper').style.display = 'none';
+            document.getElementById('results-screen').style.display = 'block';
+            
+            document.getElementById('res-title').innerText = msg || "TEST TERMINÉ";
+            document.getElementById('final-wpm').innerText = finalScore;
+            document.getElementById('final-acc').innerText = accuracy + "%";
+
+            const warning = document.getElementById('cheat-warning');
+            if (hasCheated) {
+                warning.innerText = "⚠️ TRICHE DÉTECTÉE : SCORE NON ENREGISTRÉ";
+                warning.style.display = 'block';
+            } else if (accuracy < 70) {
+                warning.innerText = "⚠️ PRÉCISION TROP FAIBLE (<70%) : SCORE NON ENREGISTRÉ";
+                warning.style.display = 'block';
+            } else {
+                warning.style.display = 'none';
+                saveScore(finalScore, accuracy);
+            }
+            loadLeaderboard();
+        }
+
+        window.addEventListener('click', () => visualInput.focus());
+        initGame();
+    </script>
+</body>
+</html>
